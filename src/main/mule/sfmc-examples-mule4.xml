@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:sfdc-marketing-cloud="http://www.mulesoft.org/schema/mule/sfdc-marketing-cloud" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc-marketing-cloud http://www.mulesoft.org/schema/mule/sfdc-marketing-cloud/current/mule-sfdc-marketing-cloud.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="bab6aa49-b78c-4525-ac03-39cbe8f1a787" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	
+		<http:request-config name="HTTP_Request_SFMC_Request_Token" doc:name="HTTP Request configuration" doc:id="fa782fc3-ea7a-4384-8098-3a1e3aca575e" >
+		<http:request-connection protocol="HTTPS" host="${sfmc.subdomain}.auth.marketingcloudapis.com" />
+	</http:request-config>
+	
+	<http:request-config name="HTTP_Request_SFMC_REST" doc:name="HTTP Request configuration" doc:id="d9e1e3d4-4b7f-4239-8203-710375657dab" >
+		<http:request-connection protocol="HTTPS" host="${sfmc.subdomain}.rest.marketingcloudapis.com" />
+	</http:request-config>
+	
+	<sfdc-marketing-cloud:config name="Salesforce_Marketing_OAuth_Client" doc:name="Salesforce Marketing Cloud Config" doc:id="0152bf86-0e54-4a49-9eef-87c087f500fb" >
+		<sfdc-marketing-cloud:oauth-client-credentials-connection serviceUrl="https://${sfmc.subdomain}.soap.marketingcloudapis.com/Service.asmx" >
+			<sfdc-marketing-cloud:oauth-client-credentials clientId="${sfmc.client_id}" clientSecret="${sfmc.client_secret}" tokenUrl="${sfmc.token_url}" />
+		</sfdc-marketing-cloud:oauth-client-credentials-connection>
+	</sfdc-marketing-cloud:config>
+	
+	<configuration-properties doc:name="Configuration properties" doc:id="30d1aa7c-726c-43aa-b2df-5d2b2d40bfd3" file="mule-properties.yaml" />
+	
+	<ee:object-store-caching-strategy name="Caching_Strategy_Access_Token" doc:name="Caching Strategy" doc:id="e21aabd4-cb89-4306-8a6b-a35ae8dd99e4" keyGenerationExpression="access_token" objectStore="accessToken"/>
+	
+	<os:object-store name="accessToken" doc:name="Object store" doc:id="50e2b803-7d99-4bc2-90ad-185c6c30a8e1" maxEntries="1" entryTtl="5" persistent="false"/>
+	<flow name="sfmc-examples-mule4Flow" doc:id="9f097e9a-5aff-4301-96a1-397c5b61a4ab" >
+		<http:listener doc:name="/create-bulk" doc:id="ee46d8fd-0f66-472d-962e-9d7e70d7c933" config-ref="HTTP_Listener_config" path="/create-bulk"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="034ac8f1-8837-4e5c-b9b8-f42dac811e8a" variableName="data"/>
+		<ee:cache doc:name="Cache" doc:id="0f3712e8-e6f6-46e5-95e7-d5635ba93c91" cachingStrategy-ref="Caching_Strategy_Access_Token">
+			<http:request method="POST" doc:name="Get Access Token" doc:id="367ec1da-9a4d-432c-8dcb-b9cd8b52e1d6" path="/v2/token" config-ref="HTTP_Request_SFMC_Request_Token">
+			<http:body><![CDATA[#[output application/json
+---
+{
+    "grant_type": "client_credentials",
+    "client_id": p('sfmc.client_id') ,
+    "client_secret": p('sfmc.client_secret'),
+    "account_id": p('sfmc.account_id')
+}]]]></http:body>
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Accept" : "*/*",
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+		</http:request>
+		</ee:cache>
+		<http:request method="POST" doc:name="SFMC REST Call" doc:id="21870aad-8a34-49db-b6c4-51dfa14896fe" config-ref="HTTP_Request_SFMC_REST" path="#[&quot;/hub/v1/dataevents/key:&quot; ++ p('sfmc.data_extension.external_key') ++ &quot;/rowset&quot;]">
+			<http:body ><![CDATA[#[vars.data]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ payload.access_token ,
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="63b8e2b7-2ee1-4bad-b57b-1187e4e6a5e3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="sfmcFlow1" doc:id="4a193423-8579-472a-b8b6-af79fe576d14" >
+		<http:listener doc:name="/create" doc:id="49c70bae-973e-4f3a-b8b1-aa3552a7886a" config-ref="HTTP_Listener_config" path="/create"/>
+		<set-payload value='#[output application/json --- {"FirstName":"Texas","LastName":"Houston", "ID": 5}]' doc:name="Set Payload" doc:id="2c4e6a7c-2200-4e37-b69f-53855de37ffc" />
+		<ee:transform doc:name="Transform Message" doc:id="a2a3f018-f637-41bc-bed5-5962addc2235" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	CustomerKey: "098FFE96-39A5-4E20-A5BE-6A4CC32D6847",
+	Properties: {
+		Property: [{
+			Name: "FirstName",
+			Value: payload.FirstName
+		},{
+			Name: "LastName",
+			Value: payload.LastName
+		},{
+			Name: "ID",
+			Value: payload.ID as String
+		}]
+	}
+},{
+	CustomerKey: "098FFE96-39A5-4E20-A5BE-6A4CC32D6847",
+	Properties: {
+		Property: [{
+			Name: "FirstName",
+			Value: payload.FirstName
+		},{
+			Name: "LastName",
+			Value: payload.LastName
+		},{
+			Name: "ID",
+			Value: "7"
+		}]
+	}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<sfdc-marketing-cloud:create doc:name="Create entities" doc:id="eb8a9253-d403-4314-a08e-84649aa42493" config-ref="Salesforce_Marketing_OAuth_Client" objectType="DataExtensionObject"/>
+		<ee:transform doc:name="Transform Message" doc:id="6764ee6e-89df-4967-8b0a-a4508ec97cc1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

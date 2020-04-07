@@ -1,0 +1,8 @@
+sfmc:
+  client_id: ""
+  client_secret: ""
+  token_url: "https://.auth.marketingcloudapis.com/v2/token"
+  subdomain: ""
+  account_id: ""
+  data_extension:
+    external_key: ""
