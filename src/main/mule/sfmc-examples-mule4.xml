@@ -72,14 +72,13 @@ payload]]></ee:set-payload>
 	</flow>
 	<flow name="sfmcFlow1" doc:id="4a193423-8579-472a-b8b6-af79fe576d14" >
 		<http:listener doc:name="/create" doc:id="49c70bae-973e-4f3a-b8b1-aa3552a7886a" config-ref="HTTP_Listener_config" path="/create"/>
-		<set-payload value='#[output application/json --- {"FirstName":"Texas","LastName":"Houston", "ID": 5}]' doc:name="Set Payload" doc:id="2c4e6a7c-2200-4e37-b69f-53855de37ffc" />
-		<ee:transform doc:name="Transform Message" doc:id="a2a3f018-f637-41bc-bed5-5962addc2235" >
+		<ee:transform doc:name="Transform Message" doc:id="b649bc59-03bc-4b6b-8543-43fd63aa19e4" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/java
 ---
 [{
-	CustomerKey: "098FFE96-39A5-4E20-A5BE-6A4CC32D6847",
+	CustomerKey: "5A93F412-7929-4E8C-9E43-6698548A5E2B",
 	Properties: {
 		Property: [{
 			Name: "FirstName",
@@ -90,20 +89,6 @@ output application/java
 		},{
 			Name: "ID",
 			Value: payload.ID as String
-		}]
-	}
-},{
-	CustomerKey: "098FFE96-39A5-4E20-A5BE-6A4CC32D6847",
-	Properties: {
-		Property: [{
-			Name: "FirstName",
-			Value: payload.FirstName
-		},{
-			Name: "LastName",
-			Value: payload.LastName
-		},{
-			Name: "ID",
-			Value: "7"
 		}]
 	}
 }]]]></ee:set-payload>
